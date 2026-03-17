@@ -198,7 +198,13 @@ class HostelViewSet(viewsets.ModelViewSet):
     filterset_fields = ['gender', 'is_active']
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'available_for_student']:
+        if self.action in [
+            'list', 'retrieve',
+            'available_for_student',
+            'rooms_with_availability',
+            'occupancy_history',
+            'room_bed_history',
+        ]:
             return [permissions.IsAuthenticated()]
         return [IsWarden()]
 
