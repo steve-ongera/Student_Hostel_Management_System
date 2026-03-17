@@ -2,33 +2,31 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './styles/main.css';
 
-// Pages
-import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
+import LoginPage from './pages/LoginPage';
 
-// Student pages
+// Student
 import StudentDashboard from './pages/student/Dashboard';
 import BookBed from './pages/student/BookBed';
 import { MyBooking, MyHistory, ChangePassword, StudentProfile, EligibilityPage } from './pages/student/StudentPages';
 
-// Warden pages
-import WardenDashboard from './pages/warden/Dashboard';
-import OccupancyMap from './pages/warden/OccupancyMap';
-import { AllBookings, Students, OccupancyHistory, AcademicYears, Reports } from './pages/warden/WardenPages';
-
-// ── Route Guards ─────────────────────────────────────────────────
+// Warden
+import WardenDashboard      from './pages/warden/Dashboard';
+import OccupancyMap         from './pages/warden/OccupancyMap';
+import HostelsPage          from './pages/warden/HostelsPage';
+import RoomsBedsPage        from './pages/warden/RoomsBedsPage';
+import StudentsPage         from './pages/warden/StudentsPage';
+import BookingsPage         from './pages/warden/BookingsPage';
+import OccupancyHistoryPage from './pages/warden/OccupancyHistoryPage';
+import AcademicYearsPage    from './pages/warden/AcademicYearsPage';
+import ReportsPage          from './pages/warden/ReportsPage';
+import WardenProfile        from './pages/warden/WardenProfile';
 
 function RequireAuth({ children, role }) {
   const { user, loading } = useAuth();
-  if (loading) return (
-    <div className="loading-overlay">
-      <span className="spinner" />
-    </div>
-  );
+  if (loading) return <div className="loading-overlay"><span className="spinner" /></div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (role && user.role !== role && user.role !== 'admin') {
-    return <Navigate to={`/${user.role}/dashboard`} replace />;
-  }
+  if (role && user.role !== role && user.role !== 'admin') return <Navigate to={`/${user.role}/dashboard`} replace />;
   return children;
 }
 
@@ -39,27 +37,24 @@ function RootRedirect() {
   return <Navigate to={`/${user.role}/dashboard`} replace />;
 }
 
-// ── App ───────────────────────────────────────────────────────────
-
 function AppRoutes() {
   return (
     <Routes>
-      {/* Root */}
       <Route path="/" element={<RootRedirect />} />
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Student Routes */}
+      {/* Student */}
       <Route path="/student/*" element={
         <RequireAuth role="student">
           <Layout>
             <Routes>
-              <Route path="dashboard" element={<StudentDashboard />} />
-              <Route path="eligibility" element={<EligibilityPage />} />
-              <Route path="hostels" element={<BookBed />} />
-              <Route path="book" element={<BookBed />} />
-              <Route path="my-booking" element={<MyBooking />} />
-              <Route path="history" element={<MyHistory />} />
-              <Route path="profile" element={<StudentProfile />} />
+              <Route path="dashboard"       element={<StudentDashboard />} />
+              <Route path="eligibility"     element={<EligibilityPage />} />
+              <Route path="hostels"         element={<BookBed />} />
+              <Route path="book"            element={<BookBed />} />
+              <Route path="my-booking"      element={<MyBooking />} />
+              <Route path="history"         element={<MyHistory />} />
+              <Route path="profile"         element={<StudentProfile />} />
               <Route path="change-password" element={<ChangePassword />} />
               <Route path="*" element={<Navigate to="dashboard" replace />} />
             </Routes>
@@ -67,18 +62,21 @@ function AppRoutes() {
         </RequireAuth>
       } />
 
-      {/* Warden Routes */}
+      {/* Warden */}
       <Route path="/warden/*" element={
         <RequireAuth role="warden">
           <Layout>
             <Routes>
-              <Route path="dashboard" element={<WardenDashboard />} />
-              <Route path="occupancy" element={<OccupancyMap />} />
-              <Route path="bookings" element={<AllBookings />} />
-              <Route path="students" element={<Students />} />
-              <Route path="history" element={<OccupancyHistory />} />
-              <Route path="academic-years" element={<AcademicYears />} />
-              <Route path="reports" element={<Reports />} />
+              <Route path="dashboard"       element={<WardenDashboard />} />
+              <Route path="occupancy"       element={<OccupancyMap />} />
+              <Route path="hostels"         element={<HostelsPage />} />
+              <Route path="rooms"           element={<RoomsBedsPage />} />
+              <Route path="students"        element={<StudentsPage />} />
+              <Route path="bookings"        element={<BookingsPage />} />
+              <Route path="history"         element={<OccupancyHistoryPage />} />
+              <Route path="academic-years"  element={<AcademicYearsPage />} />
+              <Route path="reports"         element={<ReportsPage />} />
+              <Route path="profile"         element={<WardenProfile />} />
               <Route path="change-password" element={<ChangePassword />} />
               <Route path="*" element={<Navigate to="dashboard" replace />} />
             </Routes>
@@ -86,9 +84,7 @@ function AppRoutes() {
         </RequireAuth>
       } />
 
-      {/* Admin falls through to warden */}
       <Route path="/admin/*" element={<Navigate to="/warden/dashboard" replace />} />
-
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
