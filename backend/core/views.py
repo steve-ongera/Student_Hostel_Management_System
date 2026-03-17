@@ -358,10 +358,16 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status', 'academic_year', 'student']
 
     def get_permissions(self):
-        if self.action in ['create', 'initiate_payment']:
+        # Student-only actions
+        if self.action in ['apply', 'create', 'initiate_payment']:
             return [IsStudent()]
-        if self.action in ['list', 'retrieve', 'confirm', 'cancel']:
+        # Any authenticated user
+        if self.action in [
+            'list', 'retrieve', 'confirm', 'cancel',
+            'payment_status', 'mpesa_callback',
+        ]:
             return [permissions.IsAuthenticated()]
+        # Warden/admin only
         return [IsWarden()]
 
     @action(detail=False, methods=['post'], url_path='apply')
@@ -394,7 +400,7 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
         if student.bookings.filter(academic_year=ay).exclude(status='cancelled').exists():
             return Response({'error': 'You already have an active booking for this academic year.'}, status=400)
 
-        serializer = BookingCreateSerializer(data=request.data)
+        serializer = BookingCreateSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

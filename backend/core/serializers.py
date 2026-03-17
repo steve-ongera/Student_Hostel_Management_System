@@ -337,6 +337,10 @@ class BookingCreateSerializer(serializers.Serializer):
         if bed.status == 'maintenance':
             raise serializers.ValidationError("This bed is under maintenance.")
         if bed.status == 'locked' and not bed.is_lock_expired():
+            # Allow if the lock belongs to the current user (their own lock from step 2)
+            request = self.context.get('request')
+            if request and bed.locked_by == request.user:
+                return value
             raise serializers.ValidationError("This bed is temporarily locked. Please try again shortly.")
         return value
 
