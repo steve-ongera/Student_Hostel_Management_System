@@ -162,6 +162,34 @@ class StudentViewSet(viewsets.ModelViewSet):
             return StudentEligibilitySerializer
         return StudentSerializer
 
+    def create(self, request, *args, **kwargs):
+        """Create User account first, then Student profile"""
+        data = request.data.copy()
+        username   = data.get('reg_number', '').strip()
+        password   = data.get('password', '').strip()
+        must_change = data.get('must_change_password', False)
+
+        if not username:
+            return Response({'reg_number': ['Registration number is required.']}, status=400)
+        if not password:
+            return Response({'password': ['Password is required.']}, status=400)
+        if User.objects.filter(username=username).exists():
+            return Response({'reg_number': [f'A user with username "{username}" already exists.']}, status=400)
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                role='student',
+                email=data.get('email', ''),
+                must_change_password=bool(must_change),
+            )
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=user)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=['get'], url_path='my-profile')
     def my_profile(self, request):
         student = request.user.student
@@ -609,6 +637,26 @@ class WardenViewSet(viewsets.ModelViewSet):
     queryset = Warden.objects.select_related('user').all()
     serializer_class = WardenSerializer
     permission_classes = [IsAdmin]
+
+
+# ─────────────────────────────────────────────
+# Course & Department ViewSets
+# ─────────────────────────────────────────────
+
+from .models import Course, Department
+from .serializers import CourseSerializer, DepartmentSerializer
+
+class CourseViewSet(viewsets.ModelViewSet):
+    queryset = Course.objects.select_related("department").all()
+    serializer_class = CourseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["department"]
+
+class DepartmentViewSet(viewsets.ModelViewSet):
+    queryset = Department.objects.all()
+    serializer_class = DepartmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
 # ─────────────────────────────────────────────

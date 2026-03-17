@@ -94,9 +94,12 @@ class CourseSerializer(serializers.ModelSerializer):
 # ─────────────────────────────────────────────
 
 class StudentSerializer(serializers.ModelSerializer):
-    full_name = serializers.ReadOnlyField()
-    course_name = serializers.CharField(source='course.name', read_only=True)
+    full_name    = serializers.ReadOnlyField()
+    course_name  = serializers.CharField(source='course.name', read_only=True)
     gender_display = serializers.CharField(source='get_gender_display', read_only=True)
+    # write-only: accepted on create but never returned in responses
+    password            = serializers.CharField(write_only=True, required=False)
+    must_change_password = serializers.BooleanField(write_only=True, required=False)
 
     class Meta:
         model = Student
@@ -106,8 +109,15 @@ class StudentSerializer(serializers.ModelSerializer):
             'phone', 'email', 'photo', 'course', 'course_name',
             'current_year', 'current_semester', 'status',
             'admission_date', 'admission_year', 'created_at',
+            'password', 'must_change_password',
         ]
-        read_only_fields = ['reg_number', 'created_at']
+        read_only_fields = ['created_at']
+
+    def validate_reg_number(self, value):
+        # On update (instance exists) reg_number is read-only — skip uniqueness check
+        if self.instance:
+            return self.instance.reg_number
+        return value
 
 
 class StudentEligibilitySerializer(serializers.ModelSerializer):

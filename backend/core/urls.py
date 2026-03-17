@@ -9,6 +9,7 @@ from .views import (
     AcademicYearViewSet, StudentViewSet, HostelViewSet, RoomViewSet,
     BedViewSet, BookingApplicationViewSet, WardenViewSet,
     NotificationViewSet, WardenDashboardViewSet,
+    CourseViewSet, DepartmentViewSet,
 )
 
 router = DefaultRouter()
@@ -19,6 +20,8 @@ router.register(r'rooms', RoomViewSet, basename='room')
 router.register(r'beds', BedViewSet, basename='bed')
 router.register(r'bookings', BookingApplicationViewSet, basename='booking')
 router.register(r'wardens', WardenViewSet, basename='warden')
+router.register(r'courses', CourseViewSet, basename='course')
+router.register(r'departments', DepartmentViewSet, basename='department')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'warden-dashboard', WardenDashboardViewSet, basename='warden-dashboard')
 
