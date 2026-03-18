@@ -11,7 +11,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
 from django.core.cache import cache
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -148,9 +148,11 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.select_related('user', 'course').all()
     serializer_class = StudentSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['gender', 'current_year', 'current_semester', 'status', 'course']
-    search_fields = ['reg_number', 'first_name', 'last_name']
+    search_fields = ['reg_number', 'first_name', 'last_name', 'middle_name', 'email', 'phone']
+    ordering_fields = ['reg_number', 'first_name', 'last_name', 'current_year']
+    ordering = ['reg_number']
 
     def get_permissions(self):
         if self.action in ['my_profile', 'my_eligibility', 'my_bookings', 'my_history']:
