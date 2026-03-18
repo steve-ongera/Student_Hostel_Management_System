@@ -163,10 +163,10 @@ class StudentViewSet(viewsets.ModelViewSet):
         return StudentSerializer
 
     def create(self, request, *args, **kwargs):
-        """Create User account first, then Student profile"""
+        """Create User account first, then Student profile directly"""
         data = request.data.copy()
-        username   = data.get('reg_number', '').strip()
-        password   = data.get('password', '').strip()
+        username    = data.get('reg_number', '').strip()
+        password    = data.get('password', '').strip()
         must_change = data.get('must_change_password', False)
 
         if not username:
@@ -176,7 +176,12 @@ class StudentViewSet(viewsets.ModelViewSet):
         if User.objects.filter(username=username).exists():
             return Response({'reg_number': [f'A user with username "{username}" already exists.']}, status=400)
 
+        # Validate via serializer (this also strips unknown fields)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
         with transaction.atomic():
+            # 1. Create the auth user
             user = User.objects.create_user(
                 username=username,
                 password=password,
@@ -184,11 +189,14 @@ class StudentViewSet(viewsets.ModelViewSet):
                 email=data.get('email', ''),
                 must_change_password=bool(must_change),
             )
-            serializer = self.get_serializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save(user=user)
+            # 2. Build clean student kwargs — only Student model fields
+            vd = dict(serializer.validated_data)
+            vd.pop('password', None)
+            vd.pop('must_change_password', None)
+            vd['user'] = user
+            student = Student.objects.create(**vd)
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(StudentSerializer(student).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'], url_path='my-profile')
     def my_profile(self, request):
