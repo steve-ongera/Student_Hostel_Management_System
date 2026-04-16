@@ -396,16 +396,13 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status', 'academic_year', 'student']
 
     def get_permissions(self):
-        # Student-only actions
         if self.action in ['apply', 'create', 'initiate_payment']:
             return [IsStudent()]
-        # Any authenticated user
         if self.action in [
             'list', 'retrieve', 'confirm', 'cancel',
             'payment_status', 'mpesa_callback',
         ]:
             return [permissions.IsAuthenticated()]
-        # Warden/admin only
         return [IsWarden()]
 
     @action(detail=False, methods=['post'], url_path='apply')
@@ -434,9 +431,18 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
         if not eligible:
             return Response({'error': msg}, status=status.HTTP_403_FORBIDDEN)
 
-        # Check for existing booking
-        if student.bookings.filter(academic_year=ay).exclude(status='cancelled').exists():
-            return Response({'error': 'You already have an active booking for this academic year.'}, status=400)
+        # ── FIX: delete stale cancelled/expired bookings so a fresh one can be created ──
+        student.bookings.filter(
+            academic_year=ay,
+            status__in=['cancelled', 'expired']
+        ).delete()
+
+        # Block truly active bookings
+        if student.bookings.filter(academic_year=ay).exists():
+            return Response(
+                {'error': 'You already have an active booking for this academic year.'},
+                status=400
+            )
 
         serializer = BookingCreateSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
@@ -460,10 +466,7 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
             )
 
         with transaction.atomic():
-            # Get enrollment
-            enrollment = student.enrollments.filter(
-                academic_year=ay
-            ).first()
+            enrollment = student.enrollments.filter(academic_year=ay).first()
 
             booking = BookingApplication.objects.create(
                 student=student,
@@ -474,9 +477,8 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
                 amount=bed.room.hostel.monthly_fee,
             )
 
-            # Initiate payment
             if settings.DEBUG:
-                # Dev bypass
+                # ── Dev bypass ──
                 payment = MpesaPayment.objects.create(
                     booking=booking,
                     phone_number=phone,
@@ -489,13 +491,13 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
                 booking.status = 'confirmed'
                 booking.confirmed_at = timezone.now()
                 booking.save()
+
                 bed.status = 'occupied'
                 bed.locked_by = None
                 bed.locked_at = None
                 bed.lock_expires_at = None
                 bed.save()
 
-                # Create occupancy history
                 OccupancyHistory.objects.create(
                     student=student,
                     bed=bed,
@@ -524,8 +526,9 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
                     'booking': BookingApplicationSerializer(booking).data,
                     'payment': MpesaPaymentSerializer(payment).data,
                 })
+
             else:
-                # Real M-Pesa STK Push
+                # ── Real M-Pesa STK Push ──
                 stk_result = _initiate_mpesa_stk_push(phone, booking.amount, booking.id)
                 if stk_result.get('success'):
                     payment = MpesaPayment.objects.create(
@@ -568,7 +571,6 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
         payment.raw_response = data
 
         if result_code == '0':
-            # Payment successful
             callback_metadata = data.get('CallbackMetadata', {}).get('Item', [])
             meta = {item['Name']: item.get('Value') for item in callback_metadata}
 
@@ -601,20 +603,27 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
                 }
             )
 
-            _broadcast_bed_update(bed.id, {'type': 'bed_occupied', 'bed_id': bed.id, 'room_id': bed.room.id})
+            _broadcast_bed_update(bed.id, {
+                'type': 'bed_occupied',
+                'bed_id': bed.id,
+                'room_id': bed.room.id,
+            })
             _create_notification(
                 booking.student.user,
                 'Booking Confirmed!',
                 f'Payment received. Your bed at {bed.room.hostel.name} Room {bed.room.room_number} Bed {bed.bed_number} is confirmed.',
                 'success'
             )
+
         else:
             payment.status = 'failed'
             payment.save()
+
             booking = payment.booking
             booking.status = 'cancelled'
             booking.save()
             booking.bed.unlock()
+
             _create_notification(
                 booking.student.user,
                 'Payment Failed',
@@ -637,7 +646,6 @@ class BookingApplicationViewSet(viewsets.ModelViewSet):
             })
         except Exception:
             return Response({'booking_status': booking.status, 'payment_status': None})
-
 
 # ─────────────────────────────────────────────
 # Warden ViewSet
